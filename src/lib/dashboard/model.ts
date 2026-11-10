@@ -1,4 +1,5 @@
 import type { CarrierSnapshot } from "@/lib/fmcsa/types";
+import { formatPhone } from "@/lib/phone";
 import type { Severity } from "@/lib/rules/detect";
 
 export interface WatchRow {
@@ -76,9 +77,12 @@ const usd = (n: number) => `$${n.toLocaleString("en-US")}`;
 const RULE_LABEL: Record<string, string> = {
   not_allowed_to_operate: "Allowed to operate",
   authority_lost: "Authority status",
+  authority_activated: "Authority status",
+  phone_changed: "Phone number",
   insurance_dropped: "Liability insurance on file",
   insurance_decreased: "Liability insurance on file",
   insurance_below_required: "Liability insurance on file",
+  insurance_cancellation_notice: "Liability insurance policy",
   cargo_insurance_dropped: "Cargo insurance on file",
   name_changed: "Legal name",
   address_changed: "Address",
@@ -89,6 +93,7 @@ const RULE_LABEL: Record<string, string> = {
 
 function fmt(rule: string, v: unknown): string {
   if (v === null || v === undefined || v === "") return "none";
+  if (rule === "phone_changed") return formatPhone(String(v));
   if (typeof v === "boolean") return v ? "yes" : "no";
   if (typeof v === "number") return rule.startsWith("insurance") ? usd(v) : String(v);
   if (rule === "authority_lost") return v === "A" ? "Active" : v === "I" ? "Inactive" : v === "N" ? "None" : String(v);
@@ -97,12 +102,21 @@ function fmt(rule: string, v: unknown): string {
 
 export function changesFor(a: AlertRow): Change[] {
   if (a.rule === "identity_change") {
-    const b = (a.before_value ?? {}) as { legalName?: string; address?: string };
-    const n = (a.after_value ?? {}) as { legalName?: string; address?: string };
-    return [
-      { label: "Legal name", before: fmt(a.rule, b.legalName), after: fmt(a.rule, n.legalName) },
-      { label: "Address", before: fmt(a.rule, b.address), after: fmt(a.rule, n.address) },
-    ];
+    type Parts = { legalName?: string; address?: string; phone?: string };
+    const b = (a.before_value ?? {}) as Parts;
+    const n = (a.after_value ?? {}) as Parts;
+    const rows: Change[] = [];
+    // Only the details that actually changed are stored, so only those get a row.
+    if (b.legalName !== undefined || n.legalName !== undefined) {
+      rows.push({ label: "Legal name", before: fmt(a.rule, b.legalName), after: fmt(a.rule, n.legalName) });
+    }
+    if (b.address !== undefined || n.address !== undefined) {
+      rows.push({ label: "Address", before: fmt(a.rule, b.address), after: fmt(a.rule, n.address) });
+    }
+    if (b.phone !== undefined || n.phone !== undefined) {
+      rows.push({ label: "Phone number", before: formatPhone(b.phone), after: formatPhone(n.phone) });
+    }
+    return rows;
   }
   return [
     {

@@ -3,6 +3,7 @@ import { getRequestUser } from "@/lib/auth";
 import { canUseProduct } from "@/lib/billing";
 import { getProvider } from "@/lib/fmcsa";
 import { parseList } from "@/lib/identifiers";
+import { assessCarrier } from "@/lib/rules/assess";
 import { serviceClient } from "@/lib/supabase";
 
 export const maxDuration = 60;
@@ -35,7 +36,11 @@ export async function POST(req: Request) {
   }
 
   const provider = getProvider();
-  const added: { dotNumber: string; legalName: string }[] = [];
+  const added: {
+    dotNumber: string;
+    legalName: string;
+    risks: { severity: string; title: string; detail: string }[];
+  }[] = [];
   const notFound: string[] = [];
   const failed: { input: string; message: string }[] = [];
 
@@ -66,7 +71,8 @@ export async function POST(req: Request) {
         .maybeSingle();
       if (!existing) await db.from("snapshots").insert({ dot_number: dot, data: snap });
 
-      added.push({ dotNumber: dot, legalName: snap.legalName });
+      const risks = assessCarrier(snap).map(({ severity, title, detail }) => ({ severity, title, detail }));
+      added.push({ dotNumber: dot, legalName: snap.legalName, risks });
     } catch (e) {
       failed.push({ input: label, message: (e as Error).message });
     }

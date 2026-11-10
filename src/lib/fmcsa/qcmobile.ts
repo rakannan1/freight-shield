@@ -1,4 +1,6 @@
-import type { CarrierSnapshot, FmcsaProvider } from "./types";
+import { normalizePhone } from "@/lib/phone";
+import { applyAuthority, extractAuthority, extractDockets } from "./authority";
+import type { CarrierSnapshot, FmcsaProvider, InsuranceSource } from "./types";
 
 const BASE = "https://mobile.fmcsa.dot.gov/qc/services";
 
@@ -18,14 +20,16 @@ const yes = (v: unknown): boolean | null =>
 
 /**
  * Map a raw QCMobile carrier object to our snapshot.
- * NOTE: field names below follow the public QCMobile docs; verify against a live
- * response with your web key before relying on them (see README).
+ * NOTE: FMCSA's published element list and its observed responses do not always use the same
+ * spellings (for example allowToOperate vs allowedToOperate, phyZip vs phyZipcode), so both are
+ * accepted. Authority comes from /authority, and policy filings from the optional insurance source.
+ * Run `node scripts/check-fmcsa.mjs <DOT>` with your web key to see which fields your responses really have.
  */
 export function normalizeCarrier(raw: any, now = new Date()): CarrierSnapshot {
   const street = norm(raw.phyStreet);
   const city = norm(raw.phyCity);
   const state = norm(raw.phyState);
-  const zip = norm(raw.phyZipcode);
+  const zip = norm(raw.phyZipcode ?? raw.phyZip);
   const address = [street, [city, [state, zip].filter(Boolean).join(" ")].filter(Boolean).join(", ")]
     .filter(Boolean)
     .join(", ");
@@ -35,7 +39,8 @@ export function normalizeCarrier(raw: any, now = new Date()): CarrierSnapshot {
     legalName: norm(raw.legalName),
     dbaName: norm(raw.dbaName) || null,
     address,
-    allowedToOperate: raw.allowedToOperate === "Y",
+    phone: normalizePhone(raw.telephone),
+    allowedToOperate: raw.allowedToOperate === "Y" || raw.allowToOperate === "Y",
     commonAuthority: raw.commonAuthorityStatus ?? null,
     contractAuthority: raw.contractAuthorityStatus ?? null,
     brokerAuthority: raw.brokerAuthorityStatus ?? null,
@@ -43,7 +48,7 @@ export function normalizeCarrier(raw: any, now = new Date()): CarrierSnapshot {
     bipdOnFile: num(raw.bipdInsuranceOnFile) === null ? null : num(raw.bipdInsuranceOnFile)! * 1000,
     bipdRequired: num(raw.bipdRequiredAmount) === null ? null : num(raw.bipdRequiredAmount)! * 1000,
     cargoOnFile: yes(raw.cargoInsuranceOnFile) ?? (num(raw.cargoInsuranceOnFile) === null ? null : num(raw.cargoInsuranceOnFile)! > 0),
-    outOfServiceDate: raw.oosDate ? String(raw.oosDate) : null,
+    outOfServiceDate: raw.oosDate ?? raw.outOfServiceDate ? String(raw.oosDate ?? raw.outOfServiceDate) : null,
     powerUnits: num(raw.totalPowerUnits),
     totalDrivers: num(raw.totalDrivers),
     fetchedAt: now.toISOString(),
@@ -51,7 +56,12 @@ export function normalizeCarrier(raw: any, now = new Date()): CarrierSnapshot {
 }
 
 export class QcMobileProvider implements FmcsaProvider {
-  constructor(private webKey: string, private fetchImpl: typeof fetch = fetch) {
+  constructor(
+    private webKey: string,
+    private fetchImpl: typeof fetch = fetch,
+    private insurance: InsuranceSource | null = null,
+    private onWarn: (msg: string) => void = (m) => console.warn(m),
+  ) {
     if (!webKey) throw new Error("FMCSA_WEB_KEY is not set");
   }
 
@@ -66,7 +76,34 @@ export class QcMobileProvider implements FmcsaProvider {
   async getCarrierByDot(dotNumber: string): Promise<CarrierSnapshot | null> {
     const body = await this.get(`/carriers/${encodeURIComponent(dotNumber)}`);
     const carrier = body?.content?.carrier;
-    return carrier ? normalizeCarrier(carrier) : null;
+    if (!carrier) return null;
+    let snap = normalizeCarrier(carrier);
+    const dot = encodeURIComponent(dotNumber);
+
+    // Authority and dockets are optional lookups. A failure leaves the fields unknown (null), and the
+    // snapshot job carries yesterday's values forward, so an outage cannot look like a change.
+    try {
+      snap = applyAuthority(snap, extractAuthority(await this.get(`/carriers/${dot}/authority`)));
+    } catch (e) {
+      this.onWarn(`authority lookup failed for DOT ${dotNumber}: ${(e as Error).message}`);
+    }
+
+    if (this.insurance) {
+      try {
+        let dockets: string[] = [];
+        try {
+          dockets = extractDockets(await this.get(`/carriers/${dot}/docket-numbers`));
+        } catch (e) {
+          this.onWarn(`docket lookup failed for DOT ${dotNumber}: ${(e as Error).message}`);
+        }
+        if (dockets.length) {
+          snap = { ...snap, mcNumber: dockets[0], policies: await this.insurance.getPolicies(dockets) };
+        }
+      } catch (e) {
+        this.onWarn(`insurance lookup failed for DOT ${dotNumber}: ${(e as Error).message}`);
+      }
+    }
+    return snap;
   }
 
   async resolveMcToDot(mcNumber: string): Promise<string | null> {

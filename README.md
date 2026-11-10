@@ -21,6 +21,7 @@ Claude call fails or no key is set, a plain-text summary is used instead.
 | Email sign-in (magic link) | `src/app/login/`, `src/app/auth/`, `src/middleware.ts` |
 | Dashboard (alerts, watchlist, add carriers) | `src/app/dashboard/`, model in `src/lib/dashboard/model.ts` |
 | Add carriers API | `src/app/api/carriers/route.ts` (cookie session or Bearer token) |
+| Add carriers by paste or file upload | `src/app/dashboard/AddCarriers.tsx`, parsing in `src/lib/import-parse.ts` |
 | Stripe checkout, billing portal, webhook | `src/app/api/billing/`, `src/app/api/stripe/webhook/`, `src/lib/stripe-sync.ts` |
 
 Billing is enforced only when both `STRIPE_SECRET_KEY` and `STRIPE_PRICE_ID` are set, so you can develop without
@@ -38,10 +39,15 @@ their watches.
 4. Register for a free FMCSA QCMobile web key.
 5. Copy `.env.example` to `.env.local` and fill it in. `NEXT_PUBLIC_SITE_URL` must be the public URL in production,
    because login and Stripe redirects use it.
-6. **Verify the FMCSA field names** against a real response before trusting alerts. `normalizeCarrier` in
-   `src/lib/fmcsa/qcmobile.ts` maps the raw fields (for example `commonAuthorityStatus`, `bipdInsuranceOnFile`,
-   `oosDate`), and the tests use my assumptions about them, not live data. Call
-   `https://mobile.fmcsa.dot.gov/qc/services/carriers/<DOT>?webKey=<KEY>` for a carrier you know and compare.
+6. **Verify the FMCSA data against live responses before trusting alerts. Nothing here has been tested against live FMCSA.**
+   Run `FMCSA_WEB_KEY=<key> node scripts/check-fmcsa.mjs <a DOT you know> <another>`. It prints which carrier fields
+   come back, the raw `/authority` response, and (for insurance) the real Motus column names. The code reads authority
+   from `/carriers/:dot/authority`; if that call fails it is logged and treated as unknown, never as "no authority".
+   - Check the insurance numbers (`bipdInsuranceOnFile`) against the carrier's page on FMCSA's SAFER/L&I site. They may
+     be stale if QCMobile derives them from FMCSA's older insurance extract.
+   - Optional policy filings (cancellation notices): set `INSURANCE_SOURCE=motus` **only after** you have compared the
+     real column names printed by the script with `src/lib/fmcsa/motus-columns.json` and corrected that file. The
+     column names in it are guesses.
 7. Set `CRON_SECRET` to a long random string. Add all the same variables in Vercel.
 8. Optional: `RESEND_API_KEY` and `ALERT_FROM_EMAIL` for real alert email (without them, alerts are logged to the
    console), and `ANTHROPIC_API_KEY` for Claude summaries.
@@ -59,7 +65,7 @@ their watches.
 ## Run locally
 
 ```bash
-npm test            # 57 unit tests
+npm test            # 72 unit tests
 npm run typecheck
 npm run build
 FMCSA_PROVIDER=mock npm run dev
@@ -73,11 +79,33 @@ Trigger the daily job by hand:
 curl -H "Authorization: Bearer $CRON_SECRET" http://localhost:3000/api/cron/snapshot
 ```
 
+## Adding carriers by file
+
+The dashboard accepts a pasted list or an Excel (.xlsx) or CSV file. The file is read in the browser and only the MC
+and DOT numbers are sent to the server. The numbers are loaded into the text box first, so the user can review and edit
+them before clicking Add. Rules for reading a file:
+
+- A header row naming an `MC` or `DOT` column is the reliable way. Bare numbers in an MC column are read as MC numbers
+  and bare numbers in a DOT column as DOT numbers. If a row has both, the DOT number is used. Other columns are ignored.
+- A file with one column and no header is a plain list, and bare numbers are read as DOT numbers.
+- A file with several columns and no MC or DOT header is read only for values with an explicit prefix, like `MC-123456`
+  or `DOT 1234567`. Bare numbers are never guessed, because a zip code or quantity column would otherwise add unrelated
+  carriers.
+- Only the first sheet of a workbook is read. Old `.xls` files are rejected with a message to save as `.xlsx` or CSV.
+- Limits: 2 MB per file, 500 carriers per submit. Submissions go to the server in batches of 20 so each request stays
+  within the function time limit. If a batch fails (for example, the subscription lapsed), the carriers not yet
+  processed stay in the text box.
+
+`public/carrier-template.csv` is the template linked from the form.
+
 ## Rules in v1
 
 | Rule | Severity |
 | --- | --- |
 | Not allowed to operate | critical |
+| Liability cancellation notice (needs `INSURANCE_SOURCE=motus`): critical if no other policy is in force and it is within 14 days, else warning | critical/warning |
+| Authority newly granted or reactivated | warning |
+| Phone changed alone | warning |
 | Common, contract or broker authority lost | critical |
 | Liability insurance dropped to $0, or below the required minimum | critical |
 | Legal name and address both changed (identity takeover pattern) | critical |

@@ -319,6 +319,27 @@ textarea.input {
   background: var(--ok-bg);
   color: var(--ok-ink);
 }
+.chip.info {
+  background: #e8eef7;
+  color: #1c3a66;
+}
+.risk-block {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.risk-list,
+.risk-items {
+  margin: 0;
+  padding-left: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.risk-items {
+  margin-top: 6px;
+  gap: 6px;
+}
 
 /* Alert cards */
 .alert {

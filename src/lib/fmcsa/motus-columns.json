@@ -1,0 +1,9 @@
+{
+  "_note": "Best-guess column names for FMCSA's Motus Insur dataset. NOT verified against live data. Run scripts/check-fmcsa.mjs to see the real columns, then correct this file. The first entry that exists in a row is used.",
+  "docket": "docket_number",
+  "insurer": ["insurance_company_name", "insurer_name", "ins_company_name", "company_name", "insurer"],
+  "policy": ["policy_number", "policy_no", "policy_num"],
+  "form": ["insurance_type", "form_type", "form_code", "ins_form_code", "insurance_form", "type_of_insurance"],
+  "effective": ["effective_date", "ins_effective_date", "eff_date"],
+  "cancel": ["cancel_effective_date", "cancellation_effective_date", "cancel_eff_date", "cancel_date"]
+}

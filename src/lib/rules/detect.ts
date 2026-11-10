@@ -1,4 +1,6 @@
 import type { CarrierSnapshot } from "@/lib/fmcsa/types";
+import { formatPhone } from "@/lib/phone";
+import { cancellationFinding, currentLiability, newCancellations, todayIso } from "./policies";
 
 export type Severity = "info" | "warning" | "critical";
 
@@ -15,6 +17,12 @@ const usd = (n: number | null) => (n === null ? "unknown" : `$${n.toLocaleString
 const isActive = (s: string | null) => s === "A";
 const authLabel = (s: string | null) =>
   s === "A" ? "active" : s === "I" ? "inactive" : s === "N" ? "none" : "unknown";
+
+const AUTHORITIES = [
+  ["commonAuthority", "Common"],
+  ["contractAuthority", "Contract"],
+  ["brokerAuthority", "Broker"],
+] as const;
 
 /**
  * Compare two snapshots of the same carrier and return findings.
@@ -37,12 +45,9 @@ export function detectChanges(prev: CarrierSnapshot, curr: CarrierSnapshot): Fin
   }
 
   // 2. Operating authority lost
-  for (const [field, label] of [
-    ["commonAuthority", "Common"],
-    ["contractAuthority", "Contract"],
-    ["brokerAuthority", "Broker"],
-  ] as const) {
-    if (isActive(prev[field]) && !isActive(curr[field])) {
+  for (const [field, label] of AUTHORITIES) {
+    // An unknown status today (null) is a data gap, not a loss.
+    if (isActive(prev[field]) && curr[field] !== null && !isActive(curr[field])) {
       out.push({
         rule: "authority_lost",
         severity: "critical",
@@ -52,6 +57,24 @@ export function detectChanges(prev: CarrierSnapshot, curr: CarrierSnapshot): Fin
         after: curr[field],
       });
     }
+  }
+
+  // 2b. Authority newly active or reactivated. Authority that has just come back, or just been granted,
+  // is a known pattern in carrier fraud, so it is worth a look even though it is not bad news by itself.
+  const gained = AUTHORITIES.filter(([field]) => prev[field] !== null && !isActive(prev[field]) && isActive(curr[field]));
+  if (gained.length) {
+    const reactivated = gained.some(([field]) => prev[field] === "I");
+    const labels = gained.map(([, label]) => label).join(", ");
+    out.push({
+      rule: "authority_activated",
+      severity: "warning",
+      title: reactivated ? `Authority reactivated for ${name}` : `New authority granted for ${name}`,
+      detail:
+        `${labels} authority is now active (was ${gained.map(([field]) => authLabel(prev[field])).join(", ")}). ` +
+        `Check how long this carrier has really been operating, and confirm its identity before tendering loads.`,
+      before: gained.map(([field, label]) => `${label}: ${authLabel(prev[field])}`).join(", "),
+      after: gained.map(([, label]) => `${label}: active`).join(", "),
+    });
   }
 
   // 3. Insurance
@@ -91,6 +114,18 @@ export function detectChanges(prev: CarrierSnapshot, curr: CarrierSnapshot): Fin
       after: curr.bipdOnFile,
     });
   }
+  // Cancellation notices from the insurance source (only when both days have policy data).
+  if (prev.policies && curr.policies) {
+    const today = todayIso(new Date(curr.fetchedAt));
+    const active = currentLiability(curr.policies, today) ?? [];
+    const f = cancellationFinding(
+      name,
+      active,
+      newCancellations(currentLiability(prev.policies, todayIso(new Date(prev.fetchedAt))) ?? [], active),
+      today,
+    );
+    if (f) out.push(f);
+  }
   if (prev.cargoOnFile === true && curr.cargoOnFile === false) {
     out.push({
       rule: "cargo_insurance_dropped",
@@ -102,22 +137,50 @@ export function detectChanges(prev: CarrierSnapshot, curr: CarrierSnapshot): Fin
     });
   }
 
-  // 4. Identity changes
+  // 4. Identity changes: name, address and phone. One alone is a warning. Two or more at once match the
+  // identity-takeover pattern, so they are combined into a single critical finding.
   const nameChanged = prev.legalName !== curr.legalName && prev.legalName !== "" && curr.legalName !== "";
   const addressChanged = prev.address !== curr.address && prev.address !== "" && curr.address !== "";
+  // A missing phone (null, or not stored in an older snapshot) is "unknown", never a change.
+  const phoneChanged = Boolean(prev.phone) && Boolean(curr.phone) && prev.phone !== curr.phone;
   const dbaChanged = (prev.dbaName ?? "") !== (curr.dbaName ?? "");
 
-  if (nameChanged && addressChanged) {
+  const changedKinds = [nameChanged && "name", addressChanged && "address", phoneChanged && "phone"].filter(
+    Boolean,
+  ) as string[];
+
+  if (changedKinds.length >= 2) {
+    const before: Record<string, string> = {};
+    const after: Record<string, string> = {};
+    const parts: string[] = [];
+    if (nameChanged) {
+      before.legalName = prev.legalName;
+      after.legalName = curr.legalName;
+      parts.push(`legal name from "${prev.legalName}" to "${curr.legalName}"`);
+    }
+    if (addressChanged) {
+      before.address = prev.address;
+      after.address = curr.address;
+      parts.push(`address from "${prev.address}" to "${curr.address}"`);
+    }
+    if (phoneChanged) {
+      before.phone = prev.phone as string;
+      after.phone = curr.phone as string;
+      parts.push(`phone from ${formatPhone(prev.phone)} to ${formatPhone(curr.phone)}`);
+    }
+    const list =
+      changedKinds.length === 2
+        ? `${changedKinds[0]} and ${changedKinds[1]} both`
+        : `${changedKinds.slice(0, -1).join(", ")} and ${changedKinds.at(-1)} all`;
     out.push({
       rule: "identity_change",
       severity: "critical",
-      title: `Name and address both changed for DOT ${curr.dotNumber}`,
+      title: `${list.charAt(0).toUpperCase()}${list.slice(1)} changed for DOT ${curr.dotNumber}`,
       detail:
-        `Legal name changed from "${prev.legalName}" to "${curr.legalName}" and address from ` +
-        `"${prev.address}" to "${curr.address}". Changing both at once is a common identity-takeover pattern; ` +
-        `verify the carrier by phone using a number you already trust.`,
-      before: { legalName: prev.legalName, address: prev.address },
-      after: { legalName: curr.legalName, address: curr.address },
+        `Changed: ${parts.join("; ")}. Changing several identifying details at once is a common ` +
+        `identity-takeover pattern; verify the carrier by phone using a number you already trust, not the new one.`,
+      before,
+      after,
     });
   } else {
     if (nameChanged) {
@@ -138,6 +201,18 @@ export function detectChanges(prev: CarrierSnapshot, curr: CarrierSnapshot): Fin
         detail: `Address changed from "${prev.address}" to "${curr.address}".`,
         before: prev.address,
         after: curr.address,
+      });
+    }
+    if (phoneChanged) {
+      out.push({
+        rule: "phone_changed",
+        severity: "warning",
+        title: `Phone number changed for ${name}`,
+        detail:
+          `The phone number on the FMCSA record changed from ${formatPhone(prev.phone)} to ${formatPhone(curr.phone)}. ` +
+          `Confirm the new number really belongs to the carrier before using it to verify a load or a driver.`,
+        before: prev.phone,
+        after: curr.phone,
       });
     }
   }

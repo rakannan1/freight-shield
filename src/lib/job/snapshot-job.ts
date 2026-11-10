@@ -1,5 +1,6 @@
 import { sendEmail } from "@/lib/alerts/email";
 import { summarizeFindings } from "@/lib/alerts/summarize";
+import { carryForward } from "@/lib/fmcsa/carry-forward";
 import type { CarrierSnapshot, FmcsaProvider } from "@/lib/fmcsa/types";
 import { bySeverity, detectChanges, type Finding } from "@/lib/rules/detect";
 
@@ -35,12 +36,13 @@ export interface JobDeps {
 }
 
 async function processCarrier(dot: string, d: Required<JobDeps>, r: JobResult) {
-  const curr = await d.provider.getCarrierByDot(dot);
-  if (!curr) {
+  const fetched = await d.provider.getCarrierByDot(dot);
+  if (!fetched) {
     r.notFound.push(dot);
     return;
   }
   const prev = await d.store.latestSnapshot(dot);
+  const curr = carryForward(prev, fetched);
   await d.store.saveSnapshot(dot, curr);
   r.carriers++;
 

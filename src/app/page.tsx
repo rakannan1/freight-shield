@@ -5,8 +5,8 @@ export default function Home() {
         <span className="brand-link">Freight Watch</span>
         <h1>Know when a carrier&apos;s record changes before you tender the load.</h1>
         <p className="lead">
-          We check your carriers&apos; FMCSA records every morning and email you when authority, insurance, name or
-          address changes, with a plain-English explanation of why it matters.
+          We check your carriers&apos; FMCSA records every morning and email you when authority, insurance on file, name, phone or
+          address changes (insurance cancellation notices where FMCSA publishes them), with a plain-English explanation of why it matters.
         </p>
         <div className="row">
           <a href="/login" className="btn primary">

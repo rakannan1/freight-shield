@@ -1,8 +1,8 @@
 import "./globals.css";
 
 export const metadata = {
-  title: "Freight Watch",
-  description: "Daily monitoring of your carriers' FMCSA records, with email alerts when something changes.",
+  title: "FreightShield",
+  description: "FreightShield watches FMCSA authority, insurance and contact records for every carrier you book, and tells you in plain English what changed.",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

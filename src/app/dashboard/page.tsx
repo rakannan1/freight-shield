@@ -1,3 +1,4 @@
+import { Logo } from "@/components/Logo";
 import { redirect } from "next/navigation";
 import { billingEnabled, getSubscription, isActiveStatus } from "@/lib/billing";
 import {
@@ -12,7 +13,7 @@ import { userClient } from "@/lib/supabase-user";
 import AddCarriers from "./AddCarriers";
 import { markReviewed, removeCarrier } from "./actions";
 
-export const metadata = { title: "Dashboard | Freight Watch" };
+export const metadata = { title: "Dashboard | FreightShield" };
 export const dynamic = "force-dynamic";
 
 export default async function DashboardPage({
@@ -67,9 +68,7 @@ export default async function DashboardPage({
     <div className="shell">
       <header className="topbar">
         <div className="wrap topbar-in">
-          <a href="/dashboard" className="brand-link">
-            Freight Watch
-          </a>
+          <Logo href="/dashboard" />
           <nav aria-label="Main" className="nav">
             <a href="#alerts">Alerts</a>
             <a href="#watchlist">Watchlist</a>

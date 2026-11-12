@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
+import { parseSettingsForm, toRow } from "@/lib/alerts/settings";
 import { userClient } from "@/lib/supabase-user";
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -37,4 +38,19 @@ export async function removeCarrier(formData: FormData): Promise<void> {
     await db.from("watches").delete().eq("user_id", user.id).eq("dot_number", dot);
   }
   revalidatePath("/dashboard");
+}
+
+export type SettingsState = { ok: boolean; message: string };
+
+/** Saves the signed-in user's alert settings. Row-level security limits the write to their own row. */
+export async function saveSettings(_prev: SettingsState, formData: FormData): Promise<SettingsState> {
+  const { db, user } = await requireUser();
+  const parsed = parseSettingsForm(formData, user.email);
+  if (!parsed.ok) return { ok: false, message: parsed.error };
+  const { error } = await db
+    .from("alert_settings")
+    .upsert({ user_id: user.id, ...toRow(parsed.settings), updated_at: new Date().toISOString() }, { onConflict: "user_id" });
+  if (error) return { ok: false, message: "Couldn't save your settings. Please try again." };
+  revalidatePath("/dashboard/settings");
+  return { ok: true, message: "Settings saved." };
 }

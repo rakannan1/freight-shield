@@ -1,4 +1,4 @@
-# Freight Watch
+# FreightShield
 
 Daily monitoring of carriers' FMCSA records for a broker's watchlist. When something changes (authority, insurance,
 legal name, address, out-of-service), it records an alert, shows it on the dashboard and emails the watcher.
@@ -124,3 +124,11 @@ them before clicking Add. Rules for reading a file:
 - The login link must be opened in the same browser that requested it (a Supabase PKCE requirement).
 - Not tested against live Supabase, Stripe or FMCSA from here. What I ran: unit tests, type-check, a production build,
   and a smoke test of the public pages, the login redirect and the unauthenticated API responses.
+
+## Alert settings (Settings page)
+
+Run `supabase/migrations/003_alert_settings.sql` once. Each user then controls: email digest on/off and weekly (Fridays,
+UTC) or daily cadence, text alerts (critical only, or critical plus review-level), a Slack webhook, and up to 5 extra
+email recipients who get copies. Critical changes are always emailed at once when the digest is on. The digest is sent by
+the same daily cron run. Texts need `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN` and `TWILIO_FROM_NUMBER`. The SMS, Slack
+and digest sending code has unit tests but has not been run against live Twilio, Slack or Resend.

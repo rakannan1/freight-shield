@@ -44,20 +44,26 @@ export function renderEmail(a: AlertEmail): { subject: string; html: string; tex
 }
 
 /** Sends through Resend; logs to the console when RESEND_API_KEY is not set. Returns true if sent. */
-export async function sendEmail(a: AlertEmail, fetchImpl: typeof fetch = fetch): Promise<boolean> {
-  const { subject, html, text } = renderEmail(a);
+export async function postEmail(
+  m: { to: string; subject: string; html: string; text: string },
+  fetchImpl: typeof fetch = fetch,
+): Promise<boolean> {
   const key = process.env.RESEND_API_KEY;
   const from = process.env.ALERT_FROM_EMAIL;
 
   if (!key || !from) {
-    console.log(`[email:dry-run] to=${a.to} subject="${subject}"\n${text}`);
+    console.log(`[email:dry-run] to=${m.to} subject="${m.subject}"\n${m.text}`);
     return false;
   }
 
   const res = await fetchImpl("https://api.resend.com/emails", {
     method: "POST",
     headers: { "content-type": "application/json", authorization: `Bearer ${key}` },
-    body: JSON.stringify({ from, to: a.to, subject, html, text }),
+    body: JSON.stringify({ from, to: m.to, subject: m.subject, html: m.html, text: m.text }),
   });
   return res.ok;
+}
+
+export async function sendEmail(a: AlertEmail, fetchImpl: typeof fetch = fetch): Promise<boolean> {
+  return postEmail({ to: a.to, ...renderEmail(a) }, fetchImpl);
 }

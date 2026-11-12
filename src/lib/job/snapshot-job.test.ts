@@ -3,7 +3,8 @@ import type { AlertEmail } from "@/lib/alerts/email";
 import { FIXTURES, MockProvider } from "@/lib/fmcsa/mock";
 import type { CarrierSnapshot } from "@/lib/fmcsa/types";
 import type { Finding } from "@/lib/rules/detect";
-import { runSnapshotJob, type Store } from "./snapshot-job";
+import { DEFAULT_SETTINGS } from "@/lib/alerts/settings";
+import { runSnapshotJob, type Store, type Watcher } from "./snapshot-job";
 
 class MemoryStore implements Store {
   snapshots = new Map<string, CarrierSnapshot[]>();
@@ -11,7 +12,7 @@ class MemoryStore implements Store {
   deliveries: { alertId: string; userId: string; emailed: boolean }[] = [];
   constructor(
     private dots: string[],
-    private watchers = [{ userId: "u1", email: "broker@example.com" }],
+    private watchers: Watcher[] = [{ userId: "u1", email: "broker@example.com" }],
   ) {}
   async listWatchedDotNumbers() {
     return this.dots;
@@ -97,5 +98,54 @@ describe("runSnapshotJob", () => {
     const r = await runSnapshotJob({ store, provider, summarize: noSummary, send: async () => false });
     expect(r.emailsSent).toBe(0);
     expect(store.deliveries.every((d) => !d.emailed)).toBe(true);
+  });
+
+  describe("alert settings", () => {
+    const run = async (settings: Watcher["settings"], change: Parameters<MockProvider["set"]>[1]) => {
+      const store = new MemoryStore(["1000001"], [{ userId: "u1", email: "me@x.com", settings }]);
+      const provider = fresh();
+      const send = vi.fn(async (_a: AlertEmail) => true);
+      const sendSms = vi.fn(async () => true);
+      const postSlack = vi.fn(async () => true);
+      await runSnapshotJob({ store, provider, summarize: noSummary, send, sendSms, postSlack });
+      provider.set("1000001", change);
+      const r = await runSnapshotJob({ store, provider, summarize: noSummary, send, sendSms, postSlack });
+      return { r, send, sendSms, postSlack };
+    };
+    const WARN = { address: "999 NEW ROAD, DALLAS, TX 75001" };
+    const CRIT = { allowedToOperate: false };
+
+    it("digest on: a warning is held back, nothing is emailed now", async () => {
+      const { r, send } = await run({ ...DEFAULT_SETTINGS }, WARN);
+      expect(r.alerts).toBeGreaterThan(0);
+      expect(send).not.toHaveBeenCalled();
+    });
+    it("digest on: a critical change is still emailed now, with extra recipients copied", async () => {
+      const { send } = await run({ ...DEFAULT_SETTINGS, extraRecipients: ["team@x.com"] }, CRIT);
+      expect(send.mock.calls.map((c) => c[0].to)).toEqual(["me@x.com", "team@x.com"]);
+    });
+    it("sends a text and a Slack post for a critical change", async () => {
+      const { sendSms, postSlack } = await run(
+        { ...DEFAULT_SETTINGS, smsEnabled: true, smsPhone: "+15551112222", slackEnabled: true, slackWebhookUrl: "https://hooks.slack.com/services/T/B/x" },
+        CRIT,
+      );
+      expect(sendSms).toHaveBeenCalledTimes(1);
+      expect(postSlack).toHaveBeenCalledTimes(1);
+    });
+    it("no text for a warning at the critical-only threshold", async () => {
+      const { sendSms } = await run({ ...DEFAULT_SETTINGS, smsEnabled: true, smsPhone: "+15551112222" }, WARN);
+      expect(sendSms).not.toHaveBeenCalled();
+    });
+    it("a failing text does not stop the email", async () => {
+      const store = new MemoryStore(["1000001"], [{ userId: "u1", email: "me@x.com", settings: { ...DEFAULT_SETTINGS, smsEnabled: true, smsPhone: "+15551112222" } }]);
+      const provider = fresh();
+      const send = vi.fn(async (_a: AlertEmail) => true);
+      const sendSms = vi.fn(async () => { throw new Error("twilio down"); });
+      await runSnapshotJob({ store, provider, summarize: noSummary, send, sendSms });
+      provider.set("1000001", CRIT);
+      const r = await runSnapshotJob({ store, provider, summarize: noSummary, send, sendSms });
+      expect(send).toHaveBeenCalledTimes(1);
+      expect(r.errors.some((e) => e.message.includes("text message"))).toBe(true);
+    });
   });
 });

@@ -1,4 +1,4 @@
-import { Logo } from "@/components/Logo";
+import { AppHeader } from "@/components/AppHeader";
 import { redirect } from "next/navigation";
 import { billingEnabled, getSubscription, isActiveStatus } from "@/lib/billing";
 import {
@@ -66,24 +66,7 @@ export default async function DashboardPage({
 
   return (
     <div className="shell">
-      <header className="topbar">
-        <div className="wrap topbar-in">
-          <Logo href="/dashboard" />
-          <nav aria-label="Main" className="nav">
-            <a href="#alerts">Alerts</a>
-            <a href="#watchlist">Watchlist</a>
-            <a href="#add">Add carriers</a>
-          </nav>
-          <div className="row">
-            <span className="muted small">{user.email}</span>
-            <form action="/auth/signout" method="post">
-              <button type="submit" className="btn quiet">
-                Sign out
-              </button>
-            </form>
-          </div>
-        </div>
-      </header>
+      <AppHeader email={user.email} active="dashboard" />
 
       <main className="wrap page">
         {billing === "success" ? (

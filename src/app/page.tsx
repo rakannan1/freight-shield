@@ -1,4 +1,5 @@
 import { Logo } from "@/components/Logo";
+import SampleReport from "@/components/SampleReport";
 
 export const metadata = {
   title: "FreightShield | Know when a carrier on your board goes bad",
@@ -22,6 +23,79 @@ const FEATURES = [
   {
     title: "Import your whole book",
     body: "Paste MC or DOT numbers, or upload an Excel or CSV file. Each new carrier gets an instant risk summary.",
+  },
+];
+
+const ICON = { fill: "none", stroke: "currentColor", strokeWidth: 2, strokeLinecap: "round", strokeLinejoin: "round", "aria-hidden": true, width: 24, height: 24, viewBox: "0 0 24 24" } as const;
+
+const HIGHLIGHTS = [
+  {
+    title: "Check any carrier in seconds",
+    body: "Enter an MC or DOT number and get a plain-English report you can act on while the load is still open.",
+    icon: (
+      <svg {...ICON}>
+        <circle cx="11" cy="11" r="7" />
+        <path d="m20 20-3.5-3.5" />
+      </svg>
+    ),
+    visual: (
+      <div className="mk-v-search">
+        <span>MC 900002</span>
+        <b>Check</b>
+      </div>
+    ),
+  },
+  {
+    title: "Evidence, not just a warning",
+    body: "Every finding shows where it came from, when it was checked, and what the records can't tell you.",
+    icon: (
+      <svg {...ICON}>
+        <path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z" />
+        <path d="M14 3v5h5M9 13h6M9 17h4" />
+      </svg>
+    ),
+    visual: (
+      <div className="mk-v-tags">
+        <span>Source: FMCSA record</span>
+        <span>Checked 6:02 AM</span>
+        <span className="warn">Not verified: who is calling</span>
+      </div>
+    ),
+  },
+  {
+    title: "Know what to do next",
+    body: "Each finding comes with a suggested step, such as calling the number you already have on file before booking.",
+    icon: (
+      <svg {...ICON}>
+        <path d="M5 12h14M13 6l6 6-6 6" />
+      </svg>
+    ),
+    visual: (
+      <div className="mk-v-next">
+        <strong>What to do next</strong>
+        <p>Call the carrier on the number you already had, not the new one.</p>
+      </div>
+    ),
+  },
+  {
+    title: "See exactly what changed",
+    body: "A timeline of before and after values shows what moved in a carrier's record and why it deserves a look.",
+    icon: (
+      <svg {...ICON}>
+        <circle cx="12" cy="12" r="9" />
+        <path d="M12 7v5l3 2" />
+      </svg>
+    ),
+    visual: (
+      <div className="mk-v-change">
+        <small>2 days ago · Authority</small>
+        <div className="mk-change">
+          <span className="mk-from">Active</span>
+          <span aria-hidden>→</span>
+          <span className="mk-to">Inactive</span>
+        </div>
+      </div>
+    ),
   },
 ];
 
@@ -68,6 +142,7 @@ export default function Home() {
         <header className="mk-nav">
           <Logo light />
           <nav className="mk-nav-links" aria-label="Main">
+            <a href="#demo">Try a sample</a>
             <a href="#how">How it works</a>
             <a href="#pricing">Pricing</a>
             <a href="/login" className="mk-link">
@@ -109,6 +184,37 @@ export default function Home() {
           </div>
           <AlertPreview />
         </div>
+      </section>
+
+      <section id="why" className="mk-section">
+        <div>
+          <h2>More than a filing-changed alert</h2>
+          <p className="mk-sub mk-center">Four things that turn a carrier record into a decision you can make quickly.</p>
+        </div>
+        <div className="mk-highlights">
+          {HIGHLIGHTS.map((h) => (
+            <article key={h.title} className="mk-hl">
+              <span className="mk-hl-icon">{h.icon}</span>
+              <h3>{h.title}</h3>
+              <p>{h.body}</p>
+              <div className="mk-hl-visual">{h.visual}</div>
+              <a href="#demo" className="mk-hl-link">
+                See it on a sample carrier ↓
+              </a>
+            </article>
+          ))}
+        </div>
+      </section>
+
+      <section id="demo" className="mk-section alt">
+        <div>
+          <h2>See a carrier report before you sign up</h2>
+          <p className="mk-sub mk-center">
+            Enter one of the made-up sample numbers below. Every finding shows its source, when it was checked and what
+            to do next. No sign-up needed.
+          </p>
+        </div>
+        <SampleReport />
       </section>
 
       <section id="how" className="mk-section">

@@ -1,5 +1,4 @@
 import { Logo } from "@/components/Logo";
-import SampleReport from "@/components/SampleReport";
 
 export const metadata = {
   title: "FreightShield | Know when a carrier on your board goes bad",
@@ -7,103 +6,56 @@ export const metadata = {
     "FreightShield watches FMCSA authority, insurance and contact records for every carrier you book, and tells you in plain English what changed and what to do about it.",
 };
 
-const FEATURES = [
-  {
-    title: "Authority, insurance and status",
-    body: "Active authority, liability coverage and operating status checked against FMCSA records every morning.",
-  },
-  {
-    title: "Identity-takeover signals",
-    body: "A carrier whose name, address and phone change together is flagged critical, the classic pattern behind stolen identities.",
-  },
-  {
-    title: "AI-written, rule-checked",
-    body: "Fixed rules decide what is an alert. AI then explains it in plain English and says what to do next, so it never invents an alert.",
-  },
-  {
-    title: "Import your whole book",
-    body: "Paste MC or DOT numbers, or upload an Excel or CSV file. Each new carrier gets an instant risk summary.",
-  },
-];
-
-const ICON = { fill: "none", stroke: "currentColor", strokeWidth: 2, strokeLinecap: "round", strokeLinejoin: "round", "aria-hidden": true, width: 24, height: 24, viewBox: "0 0 24 24" } as const;
-
-const HIGHLIGHTS = [
-  {
-    title: "Check any carrier in seconds",
-    body: "Enter an MC or DOT number and get a plain-English report you can act on while the load is still open.",
-    icon: (
-      <svg {...ICON}>
-        <circle cx="11" cy="11" r="7" />
-        <path d="m20 20-3.5-3.5" />
-      </svg>
-    ),
-    visual: (
-      <div className="mk-v-search">
-        <span>MC 900002</span>
-        <b>Check</b>
-      </div>
-    ),
-  },
-  {
-    title: "Evidence, not just a warning",
-    body: "Every finding shows where it came from, when it was checked, and what the records can't tell you.",
-    icon: (
-      <svg {...ICON}>
-        <path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z" />
-        <path d="M14 3v5h5M9 13h6M9 17h4" />
-      </svg>
-    ),
-    visual: (
-      <div className="mk-v-tags">
-        <span>Source: FMCSA record</span>
-        <span>Checked 6:02 AM</span>
-        <span className="warn">Not verified: who is calling</span>
-      </div>
-    ),
-  },
-  {
-    title: "Know what to do next",
-    body: "Each finding comes with a suggested step, such as calling the number you already have on file before booking.",
-    icon: (
-      <svg {...ICON}>
-        <path d="M5 12h14M13 6l6 6-6 6" />
-      </svg>
-    ),
-    visual: (
-      <div className="mk-v-next">
-        <strong>What to do next</strong>
-        <p>Call the carrier on the number you already had, not the new one.</p>
-      </div>
-    ),
-  },
-  {
-    title: "See exactly what changed",
-    body: "A timeline of before and after values shows what moved in a carrier's record and why it deserves a look.",
-    icon: (
-      <svg {...ICON}>
-        <circle cx="12" cy="12" r="9" />
-        <path d="M12 7v5l3 2" />
-      </svg>
-    ),
-    visual: (
-      <div className="mk-v-change">
-        <small>2 days ago · Authority</small>
-        <div className="mk-change">
-          <span className="mk-from">Active</span>
-          <span aria-hidden>→</span>
-          <span className="mk-to">Inactive</span>
-        </div>
-      </div>
-    ),
-  },
-];
-
 const FAQ = [
   ["Where does the data come from?", "FMCSA public records. We compare each carrier's record to the day before and alert on changes."],
   ["Can it stop double brokering?", "No. It cannot see a double-brokered load or a fake pickup in progress. It flags changes to a carrier's record, so treat it as an early warning, not a guarantee."],
   ["How do alerts arrive?", "By email, with what changed, why it matters and what to do before your next load. A dashboard shows every alert and the carriers you watch."],
   ["Can I cancel?", "Any time, from the billing page in your dashboard."],
+];
+
+const I = { fill: "none", stroke: "currentColor", strokeWidth: 2, strokeLinecap: "round", strokeLinejoin: "round", "aria-hidden": true, width: 28, height: 28, viewBox: "0 0 24 24" } as const;
+
+const STEPS: { title: string; text: string; badge?: string; icon: React.ReactNode }[] = [
+  {
+    title: "Add your carriers",
+    text: "Paste MC or DOT numbers.",
+    icon: (
+      <svg {...I}>
+        <path d="M8 6h12M8 12h12M8 18h12M4 6h.01M4 12h.01M4 18h.01" />
+      </svg>
+    ),
+  },
+  {
+    title: "We watch FMCSA daily",
+    text: "Authority, insurance and identity.",
+    icon: (
+      <svg {...I}>
+        <circle cx="12" cy="12" r="9" />
+        <path d="M12 7v5l3 2" />
+      </svg>
+    ),
+  },
+  {
+    title: "Get a clear alert",
+    text: "What changed and what to do next.",
+    badge: "AI-powered",
+    icon: (
+      <svg {...I}>
+        <path d="M12 3l1.8 4.7L18.5 9.5l-4.7 1.8L12 16l-1.8-4.7L5.5 9.5l4.7-1.8z" />
+        <path d="M19 15l.7 1.8 1.8.7-1.8.7L19 20l-.7-1.8-1.8-.7 1.8-.7z" />
+      </svg>
+    ),
+  },
+  {
+    title: "Weekly digest",
+    text: "Every change across your carriers, in one email.",
+    icon: (
+      <svg {...I}>
+        <rect x="3" y="5" width="18" height="14" rx="2" />
+        <path d="M3 7l9 6 9-6" />
+      </svg>
+    ),
+  },
 ];
 
 function AlertPreview() {
@@ -142,7 +94,6 @@ export default function Home() {
         <header className="mk-nav">
           <Logo light />
           <nav className="mk-nav-links" aria-label="Main">
-            <a href="#demo">Try a sample</a>
             <a href="#how">How it works</a>
             <a href="#pricing">Pricing</a>
             <a href="/login" className="mk-link">
@@ -186,64 +137,22 @@ export default function Home() {
         </div>
       </section>
 
-      <section id="why" className="mk-section">
-        <div>
-          <h2>More than a filing-changed alert</h2>
-          <p className="mk-sub mk-center">Four things that turn a carrier record into a decision you can make quickly.</p>
-        </div>
-        <div className="mk-highlights">
-          {HIGHLIGHTS.map((h) => (
-            <article key={h.title} className="mk-hl">
-              <span className="mk-hl-icon">{h.icon}</span>
-              <h3>{h.title}</h3>
-              <p>{h.body}</p>
-              <div className="mk-hl-visual">{h.visual}</div>
-              <a href="#demo" className="mk-hl-link">
-                See it on a sample carrier ↓
-              </a>
-            </article>
+      <section id="how" className="mk-section alt">
+        <h2>How it works</h2>
+        <p className="mk-steps-sub">Set up in two minutes. Then it runs itself.</p>
+        <ol className="mk-steps">
+          {STEPS.map((st, i) => (
+            <li key={st.title} className="mk-step">
+              <div className="mk-step-top">
+                <span className="mk-step-icon">{st.icon}</span>
+                {st.badge ? <span className="mk-step-badge">{st.badge}</span> : null}
+              </div>
+              <span className="mk-flow-n">Step {i + 1}</span>
+              <h3>{st.title}</h3>
+              <p>{st.text}</p>
+            </li>
           ))}
-        </div>
-      </section>
-
-      <section id="demo" className="mk-section alt">
-        <div>
-          <h2>See a carrier report before you sign up</h2>
-          <p className="mk-sub mk-center">
-            Enter one of the made-up sample numbers below. Every finding shows its source, when it was checked and what
-            to do next. No sign-up needed.
-          </p>
-        </div>
-        <SampleReport />
-      </section>
-
-      <section id="how" className="mk-section">
-        <h2>From your carrier list to a clear alert</h2>
-        <div className="mk-steps">
-          {[
-            ["1", "Add your carriers", "Paste MC or DOT numbers or upload a spreadsheet. You get a risk summary for each one straight away."],
-            ["2", "We check every morning", "Each record is compared with the day before. Fixed rules decide what counts as a change that matters."],
-            ["3", "You get the call", "An email says what changed, why it matters and what to do before your next load."],
-          ].map(([n, t, b]) => (
-            <div key={n} className="mk-step">
-              <span className="mk-num">{n}</span>
-              <h3>{t}</h3>
-              <p>{b}</p>
-            </div>
-          ))}
-        </div>
-      </section>
-
-      <section className="mk-section alt">
-        <h2>Built for brokers who book fast</h2>
-        <div className="mk-features">
-          {FEATURES.map((f) => (
-            <div key={f.title} className="mk-feature">
-              <h3>{f.title}</h3>
-              <p>{f.body}</p>
-            </div>
-          ))}
-        </div>
+        </ol>
       </section>
 
       <section id="pricing" className="mk-section">
